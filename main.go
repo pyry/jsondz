@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 )
 
 // UnmarshalExactMatch ...
-func UnmarshalExactMatch(b []byte, lookUp ...interface{}) (interface{}, error) {
+func UnmarshalExactMatch(b []byte, oneOff ...interface{}) (interface{}, error) {
 	// Parse json to anonymous map
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.UseNumber()
@@ -20,13 +19,10 @@ func UnmarshalExactMatch(b []byte, lookUp ...interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(f)
-	fmt.Println(string(b))
 	m := f.(map[string]interface{})
 
-	fmt.Println("RAWMAP: ", reflect.ValueOf(m).MapKeys())
 	var found interface{}
-	for _, l := range lookUp {
+	for _, l := range oneOff {
 		match := traverse(reflect.ValueOf(m), reflect.TypeOf(l))
 		if match {
 			if found != nil {
@@ -50,12 +46,11 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 	// Check if map, thus Obj in JSON
 	switch v.Kind() {
 	case reflect.Map:
-		fmt.Println("TYPE: ", v.Type())
-
-		fmt.Println("MAP ", v, t)
 
 		fieldNames, omitEmpty := getJSONFieldNames(t)
-		fmt.Println("MAP KEYS :", v.MapKeys(), " FIELD NAMES: ", fieldNames, len(fieldNames))
+		if len(fieldNames) != len(v.MapKeys()) {
+			return false
+		}
 		for _, key := range v.MapKeys() {
 			must := fieldNames[key.String()]
 			omit := omitEmpty[key.String()]
@@ -69,9 +64,6 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 				}
 				must = omit
 			}
-
-			fmt.Println("MAP PROCESS, KEY: ", key, ", FOUND: ", must)
-
 			f, _ := t.FieldByName(must)
 			ok := traverse(reflect.ValueOf(value), f.Type)
 			if !ok {
@@ -79,15 +71,10 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 			}
 		}
 	case reflect.Slice:
-		fmt.Println("TYPE: ", v.Type())
-
-		fmt.Println("SLICE! ", v, t)
-
 		if t.Kind() != reflect.Slice {
 			return false
 		}
 		trueType := t.Elem()
-		fmt.Println("TRUETYPE: ", trueType.Kind())
 		for i := 0; i < v.Len(); i++ {
 			ok := traverse(reflect.ValueOf(v.Index(i).Interface()), trueType)
 			if !ok {
@@ -96,8 +83,6 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 		}
 
 	case reflect.Bool:
-		fmt.Println("TYPE: ", v.Type())
-
 		return t.Kind() == reflect.Bool
 	case reflect.String:
 		// If number
@@ -106,17 +91,13 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 		if v.Type() == reflect.TypeOf(number) {
 			switch t.Kind() {
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				fmt.Println("INT:", v, t.Bits())
 				_, err := strconv.ParseInt(v.String(), 10, t.Bits())
 				return err == nil
 			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				fmt.Println("UINT:", v, t.Bits())
 				_, err := strconv.ParseUint(v.String(), 10, t.Bits())
 				return err == nil
 			case reflect.Float32, reflect.Float64:
-				fmt.Println("FLOAT:", v, t.Bits())
 				_, err := strconv.ParseFloat(v.String(), t.Bits())
-				fmt.Println(err)
 				return err == nil
 			default:
 				return false
@@ -153,7 +134,6 @@ func isZero(v reflect.Value) bool {
 func getJSONFieldNames(t reflect.Type) (fields map[string]string, omitEmpty map[string]string) {
 	fields = make(map[string]string)
 	omitEmpty = make(map[string]string)
-	fmt.Println("FIELD NAMES FOR ", t)
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if !field.Anonymous {
@@ -161,7 +141,6 @@ func getJSONFieldNames(t reflect.Type) (fields map[string]string, omitEmpty map[
 			omit := strings.Contains(tag, ",omitempty")
 
 			tag = strings.Replace(tag, ",omitempty", "", 1)
-			fmt.Println("TAG:", tag)
 
 			if tag == "-" {
 				continue
@@ -174,6 +153,15 @@ func getJSONFieldNames(t reflect.Type) (fields map[string]string, omitEmpty map[
 				omitEmpty[key] = field.Name
 			} else {
 				fields[key] = field.Name
+			}
+		} else {
+			// Embedded field
+			rFields, rOmitEmpty := getJSONFieldNames(field.Type)
+			for k, v := range rFields {
+				fields[k] = v
+			}
+			for k, v := range rOmitEmpty {
+				omitEmpty[k] = v
 			}
 		}
 	}

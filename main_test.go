@@ -2,7 +2,6 @@ package jsondz
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -39,11 +38,9 @@ func TestBasicNestedExample(t *testing.T) {
 
 func convert(in interface{}, options ...interface{}) (c interface{}, o interface{}, err error) {
 	b, err := json.Marshal(&in)
-	fmt.Println(string(b))
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Println("LEN:", len(b), in, err)
 	res, err := UnmarshalExactMatch(b, options...)
 	if err != nil {
 		return nil, nil, err
@@ -334,4 +331,18 @@ func TestIsZero(t *testing.T) {
 	if !isZero(reflect.ValueOf(a)) {
 		t.FailNow()
 	}
+}
+
+type node struct {
+	Embedded
+	A string
+}
+
+type Embedded struct {
+	B string
+}
+
+func TestEmbeddedStructs(t *testing.T) {
+	a := node{A: "A", Embedded: Embedded{"B"}}
+	runSingleTest(t, a, node{})
 }
