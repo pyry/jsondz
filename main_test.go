@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"reflect"
@@ -384,12 +383,12 @@ type large struct {
 func TestLargeJson(t *testing.T) {
 	f, err := os.Open("testdata/large.json.gz")
 	if err != nil {
-		log.Fatal(err)
+		t.FailNow()
 	}
 	defer f.Close()
 	gr, err := gzip.NewReader(f)
 	if err != nil {
-		log.Fatal(err)
+		t.FailNow()
 	}
 	defer gr.Close()
 
@@ -416,12 +415,12 @@ func TestLargeJson(t *testing.T) {
 func BenchmarkLargeJson(b *testing.B) {
 	f, err := os.Open("testdata/large.json.gz")
 	if err != nil {
-		log.Fatal(err)
+		b.FailNow()
 	}
 	defer f.Close()
 	gr, err := gzip.NewReader(f)
 	if err != nil {
-		log.Fatal(err)
+		b.FailNow()
 	}
 	defer gr.Close()
 
