@@ -1,8 +1,12 @@
 package jsondz
 
 import (
+	"compress/gzip"
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"math"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -41,7 +45,7 @@ func convert(in interface{}, options ...interface{}) (c interface{}, o interface
 	if err != nil {
 		return nil, nil, err
 	}
-	res, err := UnmarshalExactMatch(b, options...)
+	res, err := UnmarshalExactly(b, options...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -252,12 +256,12 @@ func TestDifferentKeys(t *testing.T) {
 
 func TestBrokenJson(t *testing.T) {
 	example := "{\"item\":\"endquote\"}"
-	_, err := UnmarshalExactMatch([]byte(example), struct{ item string }{})
+	_, err := UnmarshalExactly([]byte(example), struct{ item string }{})
 	if err != nil {
 		t.Fail()
 	}
 	example = "{\"item\":\"noendquote}"
-	_, err = UnmarshalExactMatch([]byte(example), struct{ item string }{})
+	_, err = UnmarshalExactly([]byte(example), struct{ item string }{})
 	if err == nil {
 		t.Fail()
 	}
@@ -269,7 +273,7 @@ func TestJsonOmitEmpty(t *testing.T) {
 		Field1 string `json:",omitempty"`
 		Field2 string
 	}{"", "A"}
-	result, err := UnmarshalExactMatch([]byte(jsn), s)
+	result, err := UnmarshalExactly([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -280,7 +284,7 @@ func TestJsonOmitEmpty(t *testing.T) {
 		Field1 string `json:",omitempty"`
 		Field2 string
 	}{"", "A"}
-	result, err = UnmarshalExactMatch([]byte(jsn1), s1)
+	result, err = UnmarshalExactly([]byte(jsn1), s1)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -299,7 +303,7 @@ func TestJsonOmitNilArray(t *testing.T) {
 		Field1 []int `json:",omitempty"`
 		Field2 string
 	}{[]int{}, "A"}
-	_, err := UnmarshalExactMatch([]byte(jsn), s)
+	_, err := UnmarshalExactly([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -312,7 +316,7 @@ func TestJsonOmitNilStruct(t *testing.T) {
 		Field1 struct{} `json:",omitempty"`
 		Field2 string
 	}{struct{}{}, "A"}
-	_, err := UnmarshalExactMatch([]byte(jsn), s)
+	_, err := UnmarshalExactly([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -345,4 +349,100 @@ type Embedded struct {
 func TestEmbeddedStructs(t *testing.T) {
 	a := node{A: "A", Embedded: Embedded{"B"}}
 	runSingleTest(t, a, node{})
+}
+
+type large struct {
+	Values []struct {
+		About         string `json:"about"`
+		Address       string `json:"address"`
+		Age           int    `json:"age"`
+		Balance       string `json:"balance"`
+		Company       string `json:"company"`
+		Email         string `json:"email"`
+		EyeColor      string `json:"eyeColor"`
+		FavoriteFruit string `json:"favoriteFruit"`
+		Friends       []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"friends"`
+		Gender     string   `json:"gender"`
+		Greeting   string   `json:"greeting"`
+		GUID       string   `json:"guid"`
+		ID         string   `json:"id"`
+		Index      int      `json:"index"`
+		IsActive   bool     `json:"isActive"`
+		Latitude   float64  `json:"latitude"`
+		Longitude  float64  `json:"longitude"`
+		Name       string   `json:"name"`
+		Phone      string   `json:"phone"`
+		Picture    string   `json:"picture"`
+		Registered string   `json:"registered"`
+		Tags       []string `json:"tags"`
+	} `json:"values"`
+}
+
+func TestLargeJson(t *testing.T) {
+	f, err := os.Open("testdata/large.json.gz")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gr.Close()
+
+	l := large{}
+	dat, err := ioutil.ReadAll(gr)
+	if err != nil {
+		t.FailNow()
+	}
+	res, err := UnmarshalExactly(dat, l)
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = json.Unmarshal(dat, &l)
+	if err != nil {
+
+		t.FailNow()
+	}
+	if !reflect.DeepEqual(res, &l) {
+		t.FailNow()
+	}
+}
+
+func BenchmarkLargeJson(b *testing.B) {
+	f, err := os.Open("testdata/large.json.gz")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gr.Close()
+
+	l := large{}
+	dat, err := ioutil.ReadAll(gr)
+	if err != nil {
+		b.FailNow()
+	}
+	b.ResetTimer()
+	res, err := UnmarshalExactly(dat, l)
+	if err != nil {
+		b.FailNow()
+	}
+
+	err = json.Unmarshal(dat, &l)
+	if err != nil {
+
+		b.FailNow()
+	}
+	if !reflect.DeepEqual(res, &l) {
+		b.FailNow()
+	}
+
 }

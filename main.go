@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// UnmarshalExactMatch ...
-func UnmarshalExactMatch(b []byte, oneOff ...interface{}) (interface{}, error) {
+// UnmarshalExactly ...
+func UnmarshalExactly(b []byte, intoOneOff ...interface{}) (interface{}, error) {
 	// Parse json to anonymous map
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.UseNumber()
@@ -22,7 +22,7 @@ func UnmarshalExactMatch(b []byte, oneOff ...interface{}) (interface{}, error) {
 	m := f.(map[string]interface{})
 
 	var found interface{}
-	for _, l := range oneOff {
+	for _, l := range intoOneOff {
 		match := traverse(reflect.ValueOf(m), reflect.TypeOf(l))
 		if match {
 			if found != nil {
@@ -37,16 +37,19 @@ func UnmarshalExactMatch(b []byte, oneOff ...interface{}) (interface{}, error) {
 	ins := reflect.New(reflect.TypeOf(found)).Interface()
 	err = json.Unmarshal(b, &ins)
 	if err != nil {
-		panic("This should never happen, but somehow :" + err.Error()) // Should never happen!
+		// Should never happen!
+		panic("This should never happen, but somehow this occured: " + err.Error())
 	}
 	return ins, nil
 }
 
 func traverse(v reflect.Value, t reflect.Type) (match bool) {
-	// Check if map, thus Obj in JSON
 	switch v.Kind() {
 	case reflect.Map:
-
+		// TODO: Logic here bit messy, needs cleaning
+		// Idea: fieldNames are must, omitEmpty means that JSON can't have zero val-
+		// ues in golang sense for such fields because fields with omit and empty
+		// values will not be present in resulting json
 		fieldNames, omitEmpty := getJSONFieldNames(t)
 		if len(fieldNames) != len(v.MapKeys()) {
 			return false
@@ -87,7 +90,6 @@ func traverse(v reflect.Value, t reflect.Type) (match bool) {
 	case reflect.String:
 		// If number
 		var number json.Number
-		number = ""
 		if v.Type() == reflect.TypeOf(number) {
 			switch t.Kind() {
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
