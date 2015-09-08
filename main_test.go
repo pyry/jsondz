@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-type Example struct {
+type example struct {
 	String string `json:"name"`
 	Int    int    `json:"age"`
 }
@@ -19,7 +19,7 @@ type NestedExample struct {
 	IntArray   []int `json:"IntArray"`
 	FloatArray []float64
 	Omit       chan<- struct{} `json:"-"`
-	Nested     []Example
+	Nested     []example
 	Bool       bool `json:"Bool"`
 }
 
@@ -33,7 +33,7 @@ func TestBasicNestedExample(t *testing.T) {
 		IntArray:   []int{2, 1, 3, 4, 5},
 		FloatArray: []float64{3.0, -4.0},
 		Omit:       nil,
-		Nested:     []Example{{"Jack", 50}, {"", 28}},
+		Nested:     []example{{"Jack", 50}, {"", 28}},
 		Bool:       true,
 	}
 	runSingleTest(t, example, NestedExample{}, NestedExampleExtended{})

@@ -10,7 +10,7 @@ var exampleJSON = []string{
 	`{"Up":true}`,
 }
 
-func main() {
+func Example() {
 	for _, j := range exampleJSON {
 		w, _ := Unmarshal([]byte(j), caseWorker{}, complexSetupWorker{})
 		fmt.Println(w.(Worker).Work("Hello World!"))
