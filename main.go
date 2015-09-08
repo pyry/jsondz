@@ -11,7 +11,7 @@ import (
 
 // UnmarshalExactly ...
 func UnmarshalExactly(b []byte, intoOneOff ...interface{}) (interface{}, error) {
-	// Parse json to anonymous map
+	// Parse json to anonymous map using string based numbers
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.UseNumber()
 	var f interface{}
