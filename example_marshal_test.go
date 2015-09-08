@@ -1,4 +1,4 @@
-package main
+package jsondz
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ var exampleJSON = []string{
 
 func Example() {
 	for _, j := range exampleJSON {
-		w, _ := jsondz.Unmarshal([]byte(j), caseWorker{}, complexSetupWorker{})
+		w, _ := Unmarshal([]byte(j), caseWorker{}, complexSetupWorker{})
 		fmt.Println(w.(Worker).Work("Hello World!"))
 	}
 	// Output:
