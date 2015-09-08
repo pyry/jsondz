@@ -133,7 +133,9 @@ func isZero(v reflect.Value) bool {
 	return v.Interface() == z.Interface()
 }
 
-func getJSONFieldNames(t reflect.Type) (fields map[string]string, omitEmpty map[string]string) {
+func getJSONFieldNames(t reflect.Type) (
+	fields map[string]string,
+	omitEmpty map[string]string) {
 	fields = make(map[string]string)
 	omitEmpty = make(map[string]string)
 	for i := 0; i < t.NumField(); i++ {
