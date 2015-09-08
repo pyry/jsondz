@@ -9,20 +9,74 @@ import (
 	"strings"
 )
 
-// UnmarshalExactly ...
-func UnmarshalExactly(b []byte, intoOneOff ...interface{}) (interface{}, error) {
-	// Parse json to anonymous map using string based numbers
+// Unmarshal ...
+func Unmarshal(b []byte, intoOneOff ...interface{}) (interface{}, error) {
+	res, err := UnmarshalUsingFields(b, intoOneOff...)
+	if err != nil {
+		res, err = UnmarshalUsingNew(b, intoOneOff...)
+	}
+	return res, err
+}
+
+// UnmarshalUsingNew ...
+func UnmarshalUsingNew(b []byte, intoOneOff ...interface{}) (interface{}, error) {
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.UseNumber()
-	var f interface{}
-	err := d.Decode(&f)
+	var temp interface{}
+	err := d.Decode(&temp)
 	if err != nil {
 		return nil, err
 	}
-	m := f.(map[string]interface{})
+	m := temp.(map[string]interface{})
+
+	var methodToCall reflect.Value
+	var in reflect.Type
+	for _, l := range intoOneOff {
+		// Check for proper New* functions
+		i, met, ok := checkForSingleValueNewFunction(l)
+		if !ok {
+			continue
+		}
+		// Check that we can call the new with given json
+		match := traverse(reflect.ValueOf(m), i)
+		if match {
+			if methodToCall.IsValid() {
+				return nil, errors.New("Duplicate match found!")
+			}
+			in = i
+			methodToCall = met
+		}
+	}
+	if !methodToCall.IsValid() {
+		return nil, errors.New("No match found!")
+	}
+	ins := reflect.New(in).Interface()
+
+	err = json.Unmarshal(b, &ins)
+	if err != nil {
+		// Should never happen!
+		panic("This should never happen, but somehow this occured: " + err.Error())
+	}
+	inArray := []reflect.Value{reflect.ValueOf(ins).Elem()}
+	res := methodToCall.Call(inArray)
+
+	return res[0].Interface(), nil
+}
+
+// UnmarshalUsingFields ...
+func UnmarshalUsingFields(b []byte, intoOneOff ...interface{}) (interface{}, error) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var temp interface{}
+	err := d.Decode(&temp)
+	if err != nil {
+		return nil, err
+	}
+	m := temp.(map[string]interface{})
 
 	var found interface{}
 	for _, l := range intoOneOff {
+
 		match := traverse(reflect.ValueOf(m), reflect.TypeOf(l))
 		if match {
 			if found != nil {
@@ -171,4 +225,48 @@ func getJSONFieldNames(t reflect.Type) (
 	}
 
 	return
+}
+
+func checkForSingleValueNewFunction(s interface{}) (in reflect.Type, callMethod reflect.Value, ok bool) {
+	// Check that s is indeed a struct
+	sv := reflect.ValueOf(s)
+	if sv.Kind() != reflect.Struct {
+		ok = false
+		return
+	}
+
+	callMethod = sv.MethodByName("New")
+	if !callMethod.IsValid() {
+		callMethod = sv.MethodByName("New" + strings.Title(sv.Type().Name()))
+		if !callMethod.IsValid() {
+			ok = false
+			return
+		}
+	}
+
+	if callMethod.Type().NumIn() != 1 {
+		ok = false
+		return
+	}
+	if callMethod.Type().NumOut() != 1 {
+		ok = false
+		return
+	}
+	in = callMethod.Type().In(0)
+	switch in.Kind() {
+	// No support for types below (see http://blog.golang.org/json-and-go)
+	case reflect.Func, reflect.Ptr, reflect.Chan, reflect.Complex128, reflect.Complex64:
+		ok = false
+		return
+	}
+	out := callMethod.Type().Out(0)
+	if out.Kind() != reflect.Ptr {
+		ok = false
+		return
+	}
+	if out.Elem() != sv.Type() {
+		ok = false
+		return
+	}
+	return in, callMethod, true
 }

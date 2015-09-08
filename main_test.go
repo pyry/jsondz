@@ -44,7 +44,7 @@ func convert(in interface{}, options ...interface{}) (c interface{}, o interface
 	if err != nil {
 		return nil, nil, err
 	}
-	res, err := UnmarshalExactly(b, options...)
+	res, err := Unmarshal(b, options...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -255,12 +255,12 @@ func TestDifferentKeys(t *testing.T) {
 
 func TestBrokenJson(t *testing.T) {
 	example := "{\"item\":\"endquote\"}"
-	_, err := UnmarshalExactly([]byte(example), struct{ item string }{})
+	_, err := Unmarshal([]byte(example), struct{ item string }{})
 	if err != nil {
 		t.Fail()
 	}
 	example = "{\"item\":\"noendquote}"
-	_, err = UnmarshalExactly([]byte(example), struct{ item string }{})
+	_, err = Unmarshal([]byte(example), struct{ item string }{})
 	if err == nil {
 		t.Fail()
 	}
@@ -272,7 +272,7 @@ func TestJsonOmitEmpty(t *testing.T) {
 		Field1 string `json:",omitempty"`
 		Field2 string
 	}{"", "A"}
-	result, err := UnmarshalExactly([]byte(jsn), s)
+	result, err := Unmarshal([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -283,7 +283,7 @@ func TestJsonOmitEmpty(t *testing.T) {
 		Field1 string `json:",omitempty"`
 		Field2 string
 	}{"", "A"}
-	result, err = UnmarshalExactly([]byte(jsn1), s1)
+	result, err = Unmarshal([]byte(jsn1), s1)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -302,7 +302,7 @@ func TestJsonOmitNilArray(t *testing.T) {
 		Field1 []int `json:",omitempty"`
 		Field2 string
 	}{[]int{}, "A"}
-	_, err := UnmarshalExactly([]byte(jsn), s)
+	_, err := Unmarshal([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -315,7 +315,7 @@ func TestJsonOmitNilStruct(t *testing.T) {
 		Field1 struct{} `json:",omitempty"`
 		Field2 string
 	}{struct{}{}, "A"}
-	_, err := UnmarshalExactly([]byte(jsn), s)
+	_, err := Unmarshal([]byte(jsn), s)
 	if err == nil {
 		t.Error(err)
 		t.FailNow()
@@ -397,7 +397,7 @@ func TestLargeJson(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	res, err := UnmarshalExactly(dat, l)
+	res, err := Unmarshal(dat, l)
 	if err != nil {
 		t.FailNow()
 	}
@@ -430,7 +430,7 @@ func BenchmarkLargeJson(b *testing.B) {
 		b.FailNow()
 	}
 	b.ResetTimer()
-	res, err := UnmarshalExactly(dat, l)
+	res, err := Unmarshal(dat, l)
 	if err != nil {
 		b.FailNow()
 	}
@@ -444,4 +444,100 @@ func BenchmarkLargeJson(b *testing.B) {
 		b.FailNow()
 	}
 
+}
+
+type config struct {
+	A string `json:"ID"`
+	B string `json:"about,omitempty"`
+	C string `json:"-"`
+}
+
+type foo struct{ output string }
+
+func (f foo) NewFoo(c config) *foo {
+	return &foo{c.A + c.B + c.C}
+}
+
+func TestNewFunctionBasic(t *testing.T) {
+	jsn := `{"ID":"bar"}`
+	actual, err := Unmarshal([]byte(jsn), foo{})
+	if err != nil {
+		t.FailNow()
+	}
+	if actual.(*foo).output != "bar" {
+		t.FailNow()
+	}
+}
+
+type newTest struct {
+	a string
+}
+
+type bar struct {
+}
+
+func (n newTest) New(a bar) *newTest {
+	return &newTest{"ABC"}
+}
+
+func TestNewFunction(t *testing.T) {
+	_, _, ok := checkForSingleValueNewFunction(3)
+	if ok {
+		t.FailNow()
+	}
+	st := newTest{}
+	s, _, ok := checkForSingleValueNewFunction(st)
+	if !ok || !s.AssignableTo(reflect.TypeOf(bar{})) {
+		t.FailNow()
+	}
+}
+
+type n0 struct {
+}
+
+func (n n0) New(a, b string) *n0 { return nil }
+
+type n1 struct {
+}
+
+func (n n1) New(a string) (*n1, string) { return nil, "" }
+
+type n2 struct {
+}
+
+func (n n2) New(a string) string { return "" }
+
+type n3 struct {
+}
+
+func (n n3) New(a func()) *n3 { return nil }
+
+type n4 struct {
+}
+
+func (n n4) New(a string) *n3 { return nil }
+
+func TestNewFunctionFail(t *testing.T) {
+	_, _, ok := checkForSingleValueNewFunction(n0{})
+	if ok {
+		t.FailNow()
+	}
+	_, _, ok = checkForSingleValueNewFunction(n1{})
+	if ok {
+		t.FailNow()
+	}
+	_, _, ok = checkForSingleValueNewFunction(n2{})
+	if ok {
+		t.FailNow()
+	}
+
+	_, _, ok = checkForSingleValueNewFunction(n3{})
+	if ok {
+		t.FailNow()
+	}
+
+	_, _, ok = checkForSingleValueNewFunction(n4{})
+	if ok {
+		t.FailNow()
+	}
 }
