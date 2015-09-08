@@ -467,6 +467,11 @@ func TestNewFunctionBasic(t *testing.T) {
 	if actual.(*foo).output != "bar" {
 		t.FailNow()
 	}
+	// Duplicate
+	_, err = UnmarshalUsingNew([]byte(jsn), foo{}, foo{})
+	if err == nil {
+		t.FailNow()
+	}
 }
 
 type newTest struct {
