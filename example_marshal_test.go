@@ -17,7 +17,6 @@ func Example() {
 	}
 	// Output:
 	// Processed work Hello World! at eu-central-1-com.foo.bar region-bucket
-	// HELLO WORLD!
 }
 
 // Worker interface
