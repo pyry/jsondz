@@ -4,6 +4,7 @@ pipeline:
     environment:
       - GOPATH=/drone
     commands:
+      - sleep 10
       - go get
       - go build
       - go test
@@ -12,7 +13,7 @@ pipeline:
     environment:
       - GOPATH=/drone
     commands:
-      - sleep 10
+      - sleep 5
       - go get
       - go build
       - go test
