@@ -7,3 +7,11 @@ pipeline:
       - go get
       - go build
       - go test
+  test:
+    image: golang
+    environment:
+      - GOPATH=/drone
+    commands:
+      - go get
+      - go build
+      - go test
